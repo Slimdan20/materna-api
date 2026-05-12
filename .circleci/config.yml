@@ -24,7 +24,7 @@ jobs:
 
       - run:
           name: Run tests
-          command: python -m pytest
+          command: pytest
 
   deploy:
     docker:
