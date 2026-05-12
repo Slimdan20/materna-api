@@ -3,6 +3,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from pydantic import Field
 from fastapi import Path
+from fastapi import Depends
 from dotenv import load_dotenv
 from groq import Groq
 import os
@@ -11,6 +12,17 @@ import json
 load_dotenv()
 
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+
+def get_groq():
+    return client
+
+def call_groq(prompt: str, get_groq_client) -> dict:
+    response = get_groq_client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.3
+    )
+    return json.loads(response.choices[0].message.content)
 
 app = FastAPI(
     title="Materna API",
@@ -42,15 +54,6 @@ def sanitize_input(text: str) -> str:
     return text.strip()
 
 
-def call_groq(prompt: str) -> dict:
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.3
-    )
-    return json.loads(response.choices[0].message.content)
-
-
 class RiskAssessmentRequest(BaseModel):
     trimester: int = Field(..., ge=1, le=3,
                            description="Trimester of pregnancy (1, 2, or 3)")
@@ -59,7 +62,7 @@ class RiskAssessmentRequest(BaseModel):
 
 
 @app.post("/v1/risk-assessment")
-def risk_assessment(data: RiskAssessmentRequest):
+def risk_assessment(data: RiskAssessmentRequest, get_groq_client = Depends (get_groq)):
     try:
         symptoms = [sanitize_input(s) for s in data.symptoms]
         prompt = f"""
@@ -77,7 +80,7 @@ def risk_assessment(data: RiskAssessmentRequest):
       }}
       """
 
-        result = call_groq(prompt)
+        result = call_groq(prompt, get_groq_client)
         return result
 
     except json.JSONDecodeError:
@@ -90,7 +93,7 @@ def risk_assessment(data: RiskAssessmentRequest):
 
 
 @app.get("/v1/weekly-guidance/{week}")
-def weekly_guidance(week: int = Path(..., ge=1, le=40, description="Week of pregnancy (1-40)")):
+def weekly_guidance(week: int = Path(..., ge=1, le=40, description="Week of pregnancy (1-40)"), get_groq_client = Depends (get_groq)):
     try:
         prompt = f"""
       You are a clinical maternal health assistant. Provide weekly guidance for a pregnant woman at {week} weeks gestation.
@@ -107,7 +110,7 @@ def weekly_guidance(week: int = Path(..., ge=1, le=40, description="Week of preg
           "disclaimer": "This is for informational purposes only. Always consult a qualified healthcare provider."
       }}
   """
-        result = call_groq(prompt)
+        result = call_groq(prompt, get_groq_client)
         return result
     except json.JSONDecodeError:
         raise HTTPException(
@@ -126,7 +129,7 @@ class DrugSafetyRequest(BaseModel):
 
 
 @app.post("/v1/drug-safety")
-def drug_safety(data: DrugSafetyRequest):
+def drug_safety(data: DrugSafetyRequest, get_groq_client = Depends (get_groq)):
     try:
         drug_name = sanitize_input(data.drug_name)
         prompt = f"""
@@ -143,7 +146,7 @@ def drug_safety(data: DrugSafetyRequest):
           "disclaimer": "This is for informational purposes only. Always consult a qualified healthcare provider."
       }}
       """
-        result = call_groq(prompt)
+        result = call_groq(prompt, get_groq_client)
         return result
     except json.JSONDecodeError:
         raise HTTPException(
@@ -155,7 +158,7 @@ def drug_safety(data: DrugSafetyRequest):
 
 
 @app.get("/v1/antenatal-schedule")
-def antenatal_schedule():
+def antenatal_schedule(get_groq_client = Depends (get_groq)):
     try:
         prompt = """
       You are a clinical maternal health assistant. Provide the complete recommended antenatal care schedule for a pregnant woman from booking to delivery, based on WHO and Nigerian FMOH guidelines.
@@ -178,7 +181,7 @@ def antenatal_schedule():
       }
       """
 
-        result = call_groq(prompt)
+        result = call_groq(prompt, get_groq_client)
         return result
     except json.JSONDecodeError:
         raise HTTPException(
@@ -195,7 +198,7 @@ class ConditionInformationRequest(BaseModel):
 
 
 @app.post("/v1/condition-info")
-def condition_info(data: ConditionInformationRequest):
+def condition_info(data: ConditionInformationRequest, get_groq_client = Depends (get_groq)):
     try:
         condition = sanitize_input(data.condition)
         prompt = f"""
@@ -214,7 +217,7 @@ def condition_info(data: ConditionInformationRequest):
           "disclaimer": "This is for informational purposes only. Always consult a qualified healthcare provider."
       }}      
   """
-        result = call_groq(prompt)
+        result = call_groq(prompt, get_groq_client)
         return result
     except json.JSONDecodeError:
         raise HTTPException(
@@ -234,7 +237,7 @@ class NutritionGuidanceRequest(BaseModel):
 
 
 @app.post("/v1/nutrition-guidance")
-def nutrition_guidance(data: NutritionGuidanceRequest):
+def nutrition_guidance(data: NutritionGuidanceRequest, get_groq_client = Depends (get_groq)):
     try:
         dietary_restrictions = [sanitize_input(
             r) for r in data.dietary_restrictions] if data.dietary_restrictions else []
@@ -254,7 +257,7 @@ def nutrition_guidance(data: NutritionGuidanceRequest):
           "disclaimer": "This is for informational purposes only. Always consult a qualified healthcare provider."
       }}
       """
-        result = call_groq(prompt)
+        result = call_groq(prompt, get_groq_client)
         return result
 
     except json.JSONDecodeError:
@@ -273,7 +276,7 @@ class DeliveryPrepRequest(BaseModel):
 
 
 @app.post("/v1/delivery-prep")
-def delivery_prep(data: DeliveryPrepRequest):
+def delivery_prep(data: DeliveryPrepRequest, get_groq_client = Depends (get_groq)):
     try:
         complications = [sanitize_input(
             c) for c in data.complications] if data.complications else None
@@ -293,7 +296,7 @@ def delivery_prep(data: DeliveryPrepRequest):
           "disclaimer": "This is for informational purposes only. Always consult a qualified healthcare provider."
       }}
       """
-        result = call_groq(prompt)
+        result = call_groq(prompt, get_groq_client)
         return result
     except json.JSONDecodeError:
         raise HTTPException(
@@ -305,7 +308,7 @@ def delivery_prep(data: DeliveryPrepRequest):
 
 
 @app.get("/v1/labor-signs")
-def labor_signs():
+def labor_signs(get_groq_client = Depends (get_groq)):
     try:
         prompt = """
       You are a clinical maternal health assistant. Provide comprehensive information on the signs of labor, including early signs, active labor signs, and when to seek medical attention.
@@ -322,7 +325,7 @@ def labor_signs():
           "disclaimer": "This is for informational purposes only. Always consult a qualified healthcare provider."
       }
       """
-        result = call_groq(prompt)
+        result = call_groq(prompt, get_groq_client)
         return result
     except json.JSONDecodeError:
         raise HTTPException(
