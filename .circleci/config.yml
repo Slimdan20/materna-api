@@ -1,0 +1,42 @@
+version: 2.1
+
+jobs:
+  test:
+    docker:
+      - image: cimg/python:3.12
+
+    working_directory: ~/project
+
+    steps:
+      - checkout
+
+      - run:
+          name: Install dependencies
+          command: |
+            python -m pip install --upgrade pip
+            pip install -r requirements.txt
+
+      - run:
+          name: Run tests
+          command: pytest
+
+  deploy:
+    docker:
+      - image: cimg/base:stable
+
+    steps:
+      - run:
+          name: Deploy to Render
+          command: |
+            curl "$RENDER_DEPLOY_HOOK"
+
+workflows:
+  version: 2
+
+  test_and_deploy:
+    jobs:
+      - test
+
+      - deploy:
+          requires:
+            - test
