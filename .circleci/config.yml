@@ -17,6 +17,12 @@ jobs:
             pip install -r requirements.txt
 
       - run:
+          name: Verify pytest installation
+          command: |
+            pip list
+            pytest --version
+
+      - run:
           name: Run tests
           command: python -m pytest
 
