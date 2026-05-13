@@ -1,6 +1,6 @@
 from unittest.mock import MagicMock
 from fastapi.testclient import TestClient
-from ..main import app, get_groq
+from main import app, get_groq
 import json
 
 client = TestClient(app)
