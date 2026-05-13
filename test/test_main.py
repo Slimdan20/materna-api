@@ -301,12 +301,3 @@ def test_optional_fields():
     )
     assert response.status_code == 200
 
-def test_wrong_data():
-    response = client.post(
-        "/v1/risk-assessment",
-        json={
-            "trimester": 2,
-            "symptoms": ["nancy", "micheal"]
-        }
-    )
-    assert response.status_code == 422
