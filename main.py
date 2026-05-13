@@ -71,7 +71,7 @@ class RiskAssessmentRequest(BaseModel):
 
 
 @app.post("/v1/risk-assessment")
-@limiter.limit("5/minute")
+@limiter.limit("30/minute")
 def risk_assessment(request:Request, data: RiskAssessmentRequest, get_groq_client=Depends(get_groq)):
     try:
         symptoms = [sanitize_input(s) for s in data.symptoms]
@@ -113,7 +113,7 @@ def risk_assessment(request:Request, data: RiskAssessmentRequest, get_groq_clien
 
 
 @app.get("/v1/weekly-guidance/{week}")
-@limiter.limit("5/minute")
+@limiter.limit("30/minute")
 def weekly_guidance(request:Request, week: int = Path(..., ge=1, le=40, description="Week of pregnancy (1-40)"), get_groq_client=Depends(get_groq)):
     try:
         prompt = f"""
@@ -154,7 +154,7 @@ class DrugSafetyRequest(BaseModel):
 
 
 @app.post("/v1/drug-safety")
-@limiter.limit("5/minute")
+@limiter.limit("30/minute")
 def drug_safety(request:Request, data: DrugSafetyRequest, get_groq_client=Depends(get_groq)):
     try:
         drug_name = sanitize_input(data.drug_name)
@@ -194,7 +194,7 @@ def drug_safety(request:Request, data: DrugSafetyRequest, get_groq_client=Depend
 
 
 @app.get("/v1/antenatal-schedule")
-@limiter.limit("5/minute")
+@limiter.limit("30/minute")
 def antenatal_schedule(request: Request, get_groq_client=Depends(get_groq)):
     try:
         prompt = """
@@ -239,7 +239,7 @@ class ConditionInformationRequest(BaseModel):
 
 
 @app.post("/v1/condition-info")
-@limiter.limit("5/minute")
+@limiter.limit("30/minute")
 def condition_info(request: Request, data: ConditionInformationRequest, get_groq_client=Depends(get_groq)):
     try:
         condition = sanitize_input(data.condition)
@@ -291,7 +291,7 @@ class NutritionGuidanceRequest(BaseModel):
 
 
 @app.post("/v1/nutritional-guidance")
-@limiter.limit("5/minute")
+@limiter.limit("30/minute")
 def nutritional_guidance(request:Request, data: NutritionGuidanceRequest, get_groq_client=Depends(get_groq)):
     try:
         dietary_restrictions = [sanitize_input(
@@ -343,7 +343,7 @@ class DeliveryPrepRequest(BaseModel):
 
 
 @app.post("/v1/delivery-prep")
-@limiter.limit("5/minute")
+@limiter.limit("30/minute")
 def delivery_prep(request:Request, data: DeliveryPrepRequest, get_groq_client=Depends(get_groq)):
     try:
         complications = [sanitize_input(
@@ -389,7 +389,7 @@ def delivery_prep(request:Request, data: DeliveryPrepRequest, get_groq_client=De
 
 
 @app.get("/v1/labor-signs")
-@limiter.limit("5/minute")
+@limiter.limit("30/minute")
 def labor_signs(request:Request, get_groq_client=Depends(get_groq)):
     try:
         prompt = """
@@ -412,7 +412,7 @@ def labor_signs(request:Request, get_groq_client=Depends(get_groq)):
     
     except HTTPException:
         raise
-    
+
     except json.JSONDecodeError:
         raise HTTPException(
             status_code=500, detail="AI returned an invalid response. Please try again.")
