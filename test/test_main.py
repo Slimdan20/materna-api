@@ -180,7 +180,7 @@ def test_nutritional_guidance():
 
     app.dependency_overrides[get_groq] = fake_get_groq
     response = client.post(
-        "/v1/nutrition-guidance",
+        "/v1/nutritional-guidance",
         json={
             "trimester": 1,
             "nationality": "Indian"
