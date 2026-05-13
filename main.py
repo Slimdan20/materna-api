@@ -236,8 +236,8 @@ class NutritionGuidanceRequest(BaseModel):
                              description="Nationality of the pregnant woman")
 
 
-@app.post("/v1/nutrition-guidance")
-def nutrition_guidance(data: NutritionGuidanceRequest, get_groq_client = Depends (get_groq)):
+@app.post("/v1/nutritional-guidance")
+def nutritional_guidance(data: NutritionGuidanceRequest, get_groq_client = Depends (get_groq)):
     try:
         dietary_restrictions = [sanitize_input(
             r) for r in data.dietary_restrictions] if data.dietary_restrictions else []
