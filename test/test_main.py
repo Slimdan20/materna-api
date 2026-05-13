@@ -38,6 +38,7 @@ def test_risk_assessment():
     assert "urgency" in data
     assert "recommendations" in data
 
+
 def test_weekly_guidance():
     def fake_get_groq():
         fake = MagicMock()
@@ -64,6 +65,7 @@ def test_weekly_guidance():
     assert "week" in data
     assert "fetal_development" in data
     assert "maternal_changes" in data
+
 
 def test_drug_safety():
     def fake_get_groq():
@@ -98,6 +100,7 @@ def test_drug_safety():
     assert "potential_effects" in data
     assert "alternatives" in data
 
+
 def test_antenantal_schedule():
     def fake_get_groq():
         fake = MagicMock()
@@ -107,10 +110,10 @@ def test_antenantal_schedule():
                     content=json.dumps({
                         "schedule": [
                             {
-                            "visit": "booking visit",
-                            "weeks": "before 12 weeks",
-                            "purpose": "Initial consultation and health assessment",
-                            "tests": ["Physical Examination", "Blood Tests"]
+                                "visit": "booking visit",
+                                "weeks": "before 12 weeks",
+                                "purpose": "Initial consultation and health assessment",
+                                "tests": ["Physical Examination", "Blood Tests"]
                             }
                         ],
                     })
@@ -127,6 +130,7 @@ def test_antenantal_schedule():
     assert "weeks" in data["schedule"][0]
     assert "purpose" in data["schedule"][0]
     assert "tests" in data["schedule"][0]
+
 
 def test_condition_info():
     def fake_get_groq():
@@ -153,7 +157,7 @@ def test_condition_info():
         json={
             "condition": "Gestational Diabetes"
         }
-        )
+    )
     assert response.status_code == 200
     data = response.json()
     assert "condition" in data
@@ -161,6 +165,7 @@ def test_condition_info():
     assert "symptoms" in data
     assert "management" in data
     assert "disclaimer" in data
+
 
 def test_nutritional_guidance():
     def fake_get_groq():
@@ -193,13 +198,14 @@ def test_nutritional_guidance():
     assert "recommended_meals" in data
     assert "foods_to_avoid" in data
 
+
 def test_delivery_prep():
     def fake_groq_call():
         fake = MagicMock()
         fake.chat.completions.create.return_value = MagicMock(
-            choices = [MagicMock(
-                message = MagicMock(
-                    content= json.dumps({
+            choices=[MagicMock(
+                message=MagicMock(
+                    content=json.dumps({
                         "preparation_steps": "monitor fetal movements, attend childbirth classes, and create a birth plan.",
                         "health_discussion": "discuss pain management options, labor signs, and postpartum care with your healthcare provider.",
                         "hospital_bag_checklist": "commfortable clothing, toiletries, important documents, and items for the baby.",
@@ -221,6 +227,7 @@ def test_delivery_prep():
     assert "preparation_steps" in data
     assert "health_discussion" in data
     assert "hospital_bag_checklist" in data
+
 
 def test_labour_signs():
     def fake_get_groq():
@@ -250,4 +257,56 @@ def test_labour_signs():
     assert "false_labor_signs" in data
     assert "early_signs" in data
 
+def test_invalid_trimester():
+    response = client.post(
+        "/v1/risk-assessment",
+        json={
+            "trimester": 5
+        }
+    )
 
+    assert response.status_code == 422
+
+def test_missing_fields():
+    response = client.post(
+        "/v1/risk-assessment",
+        json={
+            "trimester": 2
+        }
+    )
+
+    assert response.status_code == 422
+
+def test_wrong_data_types():
+    response = client.post(
+        "/v1/risk-assessment",
+        json={
+            "trimester": "second",
+            "symptoms": ["headache", "blurred vision"]
+        }
+    )
+
+    assert response.status_code == 422
+    
+def test_invalid_week():
+    response = client.get("/v1/weekly-guidance/50")
+    assert response.status_code == 422
+
+def test_optional_fields():
+    response = client.post(
+        "/v1/delivery-prep",
+        json={
+            "week": 20
+        }
+    )
+    assert response.status_code == 200
+
+def test_wrong_data():
+    response = client.post(
+        "/v1/risk-assessment",
+        json={
+            "trimester": 2,
+            "symptoms": ["nancy", "micheal"]
+        }
+    )
+    assert response.status_code == 422

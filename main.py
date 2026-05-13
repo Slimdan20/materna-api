@@ -13,8 +13,10 @@ load_dotenv()
 
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
+
 def get_groq():
     return client
+
 
 def call_groq(prompt: str, get_groq_client) -> dict:
     response = get_groq_client.chat.completions.create(
@@ -23,6 +25,7 @@ def call_groq(prompt: str, get_groq_client) -> dict:
         temperature=0.3
     )
     return json.loads(response.choices[0].message.content)
+
 
 app = FastAPI(
     title="Materna API",
@@ -62,7 +65,7 @@ class RiskAssessmentRequest(BaseModel):
 
 
 @app.post("/v1/risk-assessment")
-def risk_assessment(data: RiskAssessmentRequest, get_groq_client = Depends (get_groq)):
+def risk_assessment(data: RiskAssessmentRequest, get_groq_client=Depends(get_groq)):
     try:
         symptoms = [sanitize_input(s) for s in data.symptoms]
         prompt = f"""
@@ -70,6 +73,14 @@ def risk_assessment(data: RiskAssessmentRequest, get_groq_client = Depends (get_
       is reporting the following symptoms: {', '.join(symptoms)}.
 
       Keep all field values concise — maximum 1-2 sentences per field.
+
+      CRITICAL SAFETY RULE: Evaluate if the provided symptoms are actual, plausible medical symptoms or physical signs of discomfort. 
+        If the symptoms are completely invalid, names, gibberish, or unrelated to health (e.g., "nancy", "micheal"):
+        - set valid_input to false,
+        - set risk_level to null,
+        - set urgency to null,
+        - set recommendations to null,
+        - set disclaimer to "The input provided does not contain recognizable medical symptoms."
     
       Respond ONLY with a JSON object in this exact format, no extra text, no markdown:
       {{
@@ -93,7 +104,7 @@ def risk_assessment(data: RiskAssessmentRequest, get_groq_client = Depends (get_
 
 
 @app.get("/v1/weekly-guidance/{week}")
-def weekly_guidance(week: int = Path(..., ge=1, le=40, description="Week of pregnancy (1-40)"), get_groq_client = Depends (get_groq)):
+def weekly_guidance(week: int = Path(..., ge=1, le=40, description="Week of pregnancy (1-40)"), get_groq_client=Depends(get_groq)):
     try:
         prompt = f"""
       You are a clinical maternal health assistant. Provide weekly guidance for a pregnant woman at {week} weeks gestation.
@@ -129,15 +140,21 @@ class DrugSafetyRequest(BaseModel):
 
 
 @app.post("/v1/drug-safety")
-def drug_safety(data: DrugSafetyRequest, get_groq_client = Depends (get_groq)):
+def drug_safety(data: DrugSafetyRequest, get_groq_client=Depends(get_groq)):
     try:
         drug_name = sanitize_input(data.drug_name)
         prompt = f"""
       You are a clinical maternal health assistant. A pregnant woman in her {data.trimester} trimester is asking about the safety of taking {drug_name}.
     
-      
       Keep all field values concise — maximum 1-2 sentences per field.
 
+      CRITICAL SAFETY RULE: Evaluate if the provided drug name is an actual, plausible drug name. 
+        If the drug name is completely invalid, a name, gibberish, or unrelated to health (e.g., "nancy", "micheal"):
+        - set risk_level to null,
+        - set potential_effects to null,
+        - set alternatives to null,
+        - set disclaimer to "The input provided does not contain a recognizable drug name.",
+        
       Respond ONLY with a JSON object in this exact format, no extra text, no markdown:
       {{
           "risk_level": "safe | caution | unsafe",
@@ -158,7 +175,7 @@ def drug_safety(data: DrugSafetyRequest, get_groq_client = Depends (get_groq)):
 
 
 @app.get("/v1/antenatal-schedule")
-def antenatal_schedule(get_groq_client = Depends (get_groq)):
+def antenatal_schedule(get_groq_client=Depends(get_groq)):
     try:
         prompt = """
       You are a clinical maternal health assistant. Provide the complete recommended antenatal care schedule for a pregnant woman from booking to delivery, based on WHO and Nigerian FMOH guidelines.
@@ -198,7 +215,7 @@ class ConditionInformationRequest(BaseModel):
 
 
 @app.post("/v1/condition-info")
-def condition_info(data: ConditionInformationRequest, get_groq_client = Depends (get_groq)):
+def condition_info(data: ConditionInformationRequest, get_groq_client=Depends(get_groq)):
     try:
         condition = sanitize_input(data.condition)
         prompt = f"""
@@ -206,9 +223,17 @@ def condition_info(data: ConditionInformationRequest, get_groq_client = Depends 
       
       Keep all field values concise — maximum 1-2 sentences per field.
 
+      CRITICAL SAFETY RULE: Evaluate if the provided conditions are actual, plausible medical conditions. 
+        If the conditions are completely invalid, names, gibberish, or unrelated to health (e.g., "nancy", "micheal"):
+        - set description to null,
+        - set symptoms to null,
+        - set risks_in_pregnancy to null,
+        - set management to null,
+        - set when_to_seek_care to null,
+        - set disclaimer to "The input provided does not contain a recognizable medical condition.",
+
       Respond ONLY with a JSON object in this exact format, no extra text, no markdown:
       {{
-          "condition": "{condition}",
           "description": "brief description of the condition",
           "symptoms": "common symptoms of this condition in pregnancy",
           "risks_in_pregnancy": "specific risks associated with this condition during pregnancy",
@@ -237,7 +262,7 @@ class NutritionGuidanceRequest(BaseModel):
 
 
 @app.post("/v1/nutritional-guidance")
-def nutritional_guidance(data: NutritionGuidanceRequest, get_groq_client = Depends (get_groq)):
+def nutritional_guidance(data: NutritionGuidanceRequest, get_groq_client=Depends(get_groq)):
     try:
         dietary_restrictions = [sanitize_input(
             r) for r in data.dietary_restrictions] if data.dietary_restrictions else []
@@ -247,6 +272,15 @@ def nutritional_guidance(data: NutritionGuidanceRequest, get_groq_client = Depen
       You are a clinical maternal health assistant. Provide trimester-specific nutrition guidance for a pregnant woman in her {data.trimester} trimester {restrictions_text}. Tailor the advice to be culturally appropriate for someone from {nationality}.     
       
       Keep all field values concise — maximum 1-2 sentences per field.
+
+      CRITICAL SAFETY RULE: Evaluate if the provided nationality is an actual, plausible nationality. 
+        If the nationality is completely invalid, names, gibberish, or unrelated (e.g., "nancy", "micheal"):
+        - set nutritional_priority to null,
+        - set recommended_meals to null,
+        - set foods_to_avoid to null,
+        - set cultural_tips to null,
+        - set disclaimer to "The input provided does not contain a recognizable nationality."
+
 
       Respond ONLY with a JSON object in this exact format, no extra text, no markdown:
       {{
@@ -276,7 +310,7 @@ class DeliveryPrepRequest(BaseModel):
 
 
 @app.post("/v1/delivery-prep")
-def delivery_prep(data: DeliveryPrepRequest, get_groq_client = Depends (get_groq)):
+def delivery_prep(data: DeliveryPrepRequest, get_groq_client=Depends(get_groq)):
     try:
         complications = [sanitize_input(
             c) for c in data.complications] if data.complications else None
@@ -285,6 +319,15 @@ def delivery_prep(data: DeliveryPrepRequest, get_groq_client = Depends (get_groq
       You are a clinical maternal health assistant. Provide delivery preparation guidance for a pregnant woman at {data.week} weeks gestation. {complications_text}
       
       Keep all field values concise — maximum 1-2 sentences per field.
+
+      CRITICAL SAFETY RULE: Evaluate if the provided complications are actual, plausible medical complications or physical signs of discomfort. 
+        If the complications are completely invalid, names, gibberish, or unrelated to health (e.g., "nancy", "micheal"):
+        - set preparation_steps to null,
+        - set health_discussion to null,
+        - set hospital_bag_checklist to null,
+        - set birth_preference to null,
+        - set disclaimer to "The input provided does not contain recognizable medical complications.",
+
 
       Respond ONLY with a JSON object in this exact format, no extra text, no markdown:
       {{
@@ -308,7 +351,7 @@ def delivery_prep(data: DeliveryPrepRequest, get_groq_client = Depends (get_groq
 
 
 @app.get("/v1/labor-signs")
-def labor_signs(get_groq_client = Depends (get_groq)):
+def labor_signs(get_groq_client=Depends(get_groq)):
     try:
         prompt = """
       You are a clinical maternal health assistant. Provide comprehensive information on the signs of labor, including early signs, active labor signs, and when to seek medical attention.
