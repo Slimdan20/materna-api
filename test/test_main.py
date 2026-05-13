@@ -5,6 +5,29 @@ import json
 
 client = TestClient(app)
 
+def test_invalid_ai_response():
+    def fake_get_groq():
+        fake = MagicMock()
+        fake.chat.completions.create.return_value = MagicMock(
+            choices=[MagicMock(
+                message=MagicMock(
+                    content="not valid json"
+                )
+            )]
+        )
+        return fake
+
+    app.dependency_overrides[get_groq] = fake_get_groq
+
+    response = client.post(
+        "/v1/risk-assessment",
+        json={
+            "trimester": 2,
+            "symptoms": ["headache"]
+        }
+    )
+
+    assert response.status_code == 500
 
 def test_risk_assessment():
     def fake_get_groq():
@@ -15,7 +38,7 @@ def test_risk_assessment():
                     content=json.dumps({
                         "risk_level": "high",
                         "urgency": "immediate",
-                        "recommendations": "Consult your healthcare provider immediately",
+                        "recommendations": ["Consult your healthcare provider immediately"],
                         "disclaimer": "This is for informational purposes only. Always consult a qualified healthcare provider."
                     })
                 )
@@ -101,7 +124,7 @@ def test_drug_safety():
     assert "alternatives" in data
 
 
-def test_antenantal_schedule():
+def test_antenatal_schedule():
     def fake_get_groq():
         fake = MagicMock()
         fake.chat.completions.create.return_value = MagicMock(
@@ -208,7 +231,7 @@ def test_delivery_prep():
                     content=json.dumps({
                         "preparation_steps": "monitor fetal movements, attend childbirth classes, and create a birth plan.",
                         "health_discussion": "discuss pain management options, labor signs, and postpartum care with your healthcare provider.",
-                        "hospital_bag_checklist": "commfortable clothing, toiletries, important documents, and items for the baby.",
+                        "hospital_bag_checklist": "comfortable clothing, toiletries, important documents, and items for the baby.",
                         "disclaimer": "This is for informational purposes only. Always consult a qualified healthcare provider."
                     })
                 )
@@ -261,13 +284,14 @@ def test_invalid_trimester():
     response = client.post(
         "/v1/risk-assessment",
         json={
-            "trimester": 5
+            "trimester": 5,
+            "symptoms": ["headache", "blurred vision"]
         }
     )
 
     assert response.status_code == 422
 
-def test_missing_fields():
+def test_missing_symptoms():
     response = client.post(
         "/v1/risk-assessment",
         json={
@@ -294,9 +318,10 @@ def test_invalid_week():
 
 def test_optional_fields():
     response = client.post(
-        "/v1/delivery-prep",
+        "/v1/nutritional-guidance",
         json={
-            "week": 20
+            "trimester": 3,
+            "nationality": "indian"
         }
     )
     assert response.status_code == 200
