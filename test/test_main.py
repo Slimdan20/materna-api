@@ -171,6 +171,7 @@ def test_nutritional_guidance():
                         "nutrient_priority": "Folic acid, iron, calcium, and protein are essential nutrients during pregnancy.",
                         "recommended_meals": "Focus on folic acid-rich foods, such as leafy greens and fortified cereals.",
                         "foods_to_avoid": "This is for informational purposes only. Always consult a qualified healthcare provider."
+                        "disclaimer": "Avoid high-mercury fish, unpasteurized dairy products, and undercooked meats."
                     })
                 )
             )]
