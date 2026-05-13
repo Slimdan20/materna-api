@@ -160,6 +160,7 @@ def test_condition_info():
     assert "description" in data
     assert "symptoms" in data
     assert "management" in data
+    assert "disclaimer" in data
 
 def test_nutritional_guidance():
     def fake_get_groq():
