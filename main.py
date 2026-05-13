@@ -1,13 +1,27 @@
 from typing import Optional
 from fastapi import FastAPI, HTTPException
+from fastapi import Request
 from pydantic import BaseModel
 from pydantic import Field
 from fastapi import Path
 from fastapi import Depends
 from dotenv import load_dotenv
 from groq import Groq
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 import os
 import json
+
+limiter = Limiter(key_func=get_remote_address)
+app = FastAPI(
+    title="Materna API",
+    description="Materna is an AI-powered maternal health API that provides risk assessment, weekly pregnancy guidance, drug safety checks, antenatal scheduling, and delivery preparation — built for developers creating maternal health applications across Africa and beyond.",
+    version="1.0.0"
+)
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 load_dotenv()
 
@@ -26,14 +40,6 @@ def call_groq(prompt: str, get_groq_client) -> dict:
     )
     return json.loads(response.choices[0].message.content)
 
-
-app = FastAPI(
-    title="Materna API",
-    description="Materna is an AI-powered maternal health API that provides risk assessment, weekly pregnancy guidance, drug safety checks, antenatal scheduling, and delivery preparation — built for developers creating maternal health applications across Africa and beyond.",
-    version="1.0.0"
-
-
-)
 
 
 def sanitize_input(text: str) -> str:
@@ -65,7 +71,8 @@ class RiskAssessmentRequest(BaseModel):
 
 
 @app.post("/v1/risk-assessment")
-def risk_assessment(data: RiskAssessmentRequest, get_groq_client=Depends(get_groq)):
+@limiter.limit("5/minute")
+def risk_assessment(request:Request, data: RiskAssessmentRequest, get_groq_client=Depends(get_groq)):
     try:
         symptoms = [sanitize_input(s) for s in data.symptoms]
         prompt = f"""
@@ -76,7 +83,6 @@ def risk_assessment(data: RiskAssessmentRequest, get_groq_client=Depends(get_gro
 
       CRITICAL SAFETY RULE: Evaluate if the provided symptoms are actual, plausible medical symptoms or physical signs of discomfort. 
         If the symptoms are completely invalid, names, gibberish, or unrelated to health (e.g., "nancy", "micheal"):
-        - set valid_input to false,
         - set risk_level to null,
         - set urgency to null,
         - set recommendations to null,
@@ -93,6 +99,9 @@ def risk_assessment(data: RiskAssessmentRequest, get_groq_client=Depends(get_gro
 
         result = call_groq(prompt, get_groq_client)
         return result
+    
+    except HTTPException:
+        raise
 
     except json.JSONDecodeError:
         raise HTTPException(
@@ -104,7 +113,8 @@ def risk_assessment(data: RiskAssessmentRequest, get_groq_client=Depends(get_gro
 
 
 @app.get("/v1/weekly-guidance/{week}")
-def weekly_guidance(week: int = Path(..., ge=1, le=40, description="Week of pregnancy (1-40)"), get_groq_client=Depends(get_groq)):
+@limiter.limit("5/minute")
+def weekly_guidance(request:Request, week: int = Path(..., ge=1, le=40, description="Week of pregnancy (1-40)"), get_groq_client=Depends(get_groq)):
     try:
         prompt = f"""
       You are a clinical maternal health assistant. Provide weekly guidance for a pregnant woman at {week} weeks gestation.
@@ -123,6 +133,10 @@ def weekly_guidance(week: int = Path(..., ge=1, le=40, description="Week of preg
   """
         result = call_groq(prompt, get_groq_client)
         return result
+    
+    except HTTPException:
+        raise
+
     except json.JSONDecodeError:
         raise HTTPException(
             status_code=500, detail="AI returned an invalid response. Please try again.")
@@ -140,7 +154,8 @@ class DrugSafetyRequest(BaseModel):
 
 
 @app.post("/v1/drug-safety")
-def drug_safety(data: DrugSafetyRequest, get_groq_client=Depends(get_groq)):
+@limiter.limit("5/minute")
+def drug_safety(request:Request, data: DrugSafetyRequest, get_groq_client=Depends(get_groq)):
     try:
         drug_name = sanitize_input(data.drug_name)
         prompt = f"""
@@ -165,6 +180,10 @@ def drug_safety(data: DrugSafetyRequest, get_groq_client=Depends(get_groq)):
       """
         result = call_groq(prompt, get_groq_client)
         return result
+    
+    except HTTPException:
+        raise
+
     except json.JSONDecodeError:
         raise HTTPException(
             status_code=500, detail="AI returned an invalid response. Please try again.")
@@ -175,7 +194,8 @@ def drug_safety(data: DrugSafetyRequest, get_groq_client=Depends(get_groq)):
 
 
 @app.get("/v1/antenatal-schedule")
-def antenatal_schedule(get_groq_client=Depends(get_groq)):
+@limiter.limit("5/minute")
+def antenatal_schedule(request: Request, get_groq_client=Depends(get_groq)):
     try:
         prompt = """
       You are a clinical maternal health assistant. Provide the complete recommended antenatal care schedule for a pregnant woman from booking to delivery, based on WHO and Nigerian FMOH guidelines.
@@ -200,6 +220,10 @@ def antenatal_schedule(get_groq_client=Depends(get_groq)):
 
         result = call_groq(prompt, get_groq_client)
         return result
+    
+    except HTTPException:
+        raise
+
     except json.JSONDecodeError:
         raise HTTPException(
             status_code=500, detail="AI returned an invalid response. Please try again.")
@@ -215,7 +239,8 @@ class ConditionInformationRequest(BaseModel):
 
 
 @app.post("/v1/condition-info")
-def condition_info(data: ConditionInformationRequest, get_groq_client=Depends(get_groq)):
+@limiter.limit("5/minute")
+def condition_info(request: Request, data: ConditionInformationRequest, get_groq_client=Depends(get_groq)):
     try:
         condition = sanitize_input(data.condition)
         prompt = f"""
@@ -244,6 +269,10 @@ def condition_info(data: ConditionInformationRequest, get_groq_client=Depends(ge
   """
         result = call_groq(prompt, get_groq_client)
         return result
+    
+    except HTTPException:
+        raise
+
     except json.JSONDecodeError:
         raise HTTPException(
             status_code=500, detail="AI returned an invalid response. Please try again.")
@@ -262,7 +291,8 @@ class NutritionGuidanceRequest(BaseModel):
 
 
 @app.post("/v1/nutritional-guidance")
-def nutritional_guidance(data: NutritionGuidanceRequest, get_groq_client=Depends(get_groq)):
+@limiter.limit("5/minute")
+def nutritional_guidance(request:Request, data: NutritionGuidanceRequest, get_groq_client=Depends(get_groq)):
     try:
         dietary_restrictions = [sanitize_input(
             r) for r in data.dietary_restrictions] if data.dietary_restrictions else []
@@ -293,6 +323,9 @@ def nutritional_guidance(data: NutritionGuidanceRequest, get_groq_client=Depends
       """
         result = call_groq(prompt, get_groq_client)
         return result
+    
+    except HTTPException:
+        raise
 
     except json.JSONDecodeError:
         raise HTTPException(
@@ -310,7 +343,8 @@ class DeliveryPrepRequest(BaseModel):
 
 
 @app.post("/v1/delivery-prep")
-def delivery_prep(data: DeliveryPrepRequest, get_groq_client=Depends(get_groq)):
+@limiter.limit("5/minute")
+def delivery_prep(request:Request, data: DeliveryPrepRequest, get_groq_client=Depends(get_groq)):
     try:
         complications = [sanitize_input(
             c) for c in data.complications] if data.complications else None
@@ -341,6 +375,10 @@ def delivery_prep(data: DeliveryPrepRequest, get_groq_client=Depends(get_groq)):
       """
         result = call_groq(prompt, get_groq_client)
         return result
+    
+    except HTTPException:
+        raise
+
     except json.JSONDecodeError:
         raise HTTPException(
             status_code=500, detail="AI returned an invalid response. Please try again.")
@@ -351,7 +389,8 @@ def delivery_prep(data: DeliveryPrepRequest, get_groq_client=Depends(get_groq)):
 
 
 @app.get("/v1/labor-signs")
-def labor_signs(get_groq_client=Depends(get_groq)):
+@limiter.limit("5/minute")
+def labor_signs(request:Request, get_groq_client=Depends(get_groq)):
     try:
         prompt = """
       You are a clinical maternal health assistant. Provide comprehensive information on the signs of labor, including early signs, active labor signs, and when to seek medical attention.
@@ -370,6 +409,10 @@ def labor_signs(get_groq_client=Depends(get_groq)):
       """
         result = call_groq(prompt, get_groq_client)
         return result
+    
+    except HTTPException:
+        raise
+    
     except json.JSONDecodeError:
         raise HTTPException(
             status_code=500, detail="AI returned an invalid response. Please try again.")
