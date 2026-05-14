@@ -27,6 +27,9 @@ Materna provides interactive Swagger documentation at:
 
 https://materna-api-1.onrender.com/docs
 
+<img width="3840" height="2160" alt="image" src="https://github.com/user-attachments/assets/7d3d44ec-c6b8-4e54-a4c1-4fe54b139506" />
+
+
 ## Quick start
 
 Make your first request to the Materna API and fetch labor-signs data
@@ -144,6 +147,8 @@ Materna API uses CircleCI to automate:
 - Deployment workflows to Render
 
 This ensures endpoints are validated before deployment.
+
+<img width="3840" height="1993" alt="Screenshot (653)" src="https://github.com/user-attachments/assets/d3a17d65-1dec-4a79-8615-7895110c3767" />
 
 ## API Endpoints
 
