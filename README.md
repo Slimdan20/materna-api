@@ -77,12 +77,9 @@ import requests
 url = "https://materna-api-1.onrender.com/v1/labor-signs"
 
 try:
-    response = requests.get(url)
-
+    response = requests.get(url, timeout=60)
     response.raise_for_status()
-
     data = response.json()
-
     print(data)
 
 except requests.exceptions.HTTPError as err:
@@ -96,8 +93,6 @@ except requests.exceptions.Timeout:
 
 except requests.exceptions.RequestException as err:
     print(f"An error occurred: {err}")
-
-response = requests.get(url, timeout=60)
 ```
 
 ## Features
@@ -159,23 +154,21 @@ This ensures endpoints are validated before deployment.
 | POST   | /v1/drug-safety            | Evaluate medication safety during pregnancy                  |
 | GET    | /v1/antenatal-schedule     | Return WHO-informed antenatal schedules                      |
 | POST   | /v1/condition-info         | Provide pregnancy-related condition information              |
-| POST   | /v1/nutrional-guidance     | Generate culturally tailored nutrition guidance              |
+| POST   | /v1/nutritional-guidance     | Generate culturally tailored nutrition guidance              |
 | POST   | /v1/delivery-prep          | Provide complication-based delivery preparation guidance     |
 | GET    | /v1/labor-signs            | Return true and false labor indicators                       |
-
-## Local setup
 
 ## Local Setup
 
 To setup and utilize Materna API in your local computer, follow the outlined steps
 
-Step 1: Clone the repository
+**Step 1:** Clone the repository
 
 ```bash   
 git clone https://github.com/Slimdan20/materna-api.git
 ```
 
-Step 2: Create and activate a virtual environment
+**Step 2:** Create and activate a virtual environment
 
 ```bash
 python -m venv .venv
@@ -183,22 +176,22 @@ source .venv/Scripts/activate  # Windows
 source .venv/bin/activate       # Mac/Linux
 ```
 
-Step 3: Install dependencies
+**Step 3:** Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-Step 4: Create a `.env` file in your root directory
+**Step 4:** Create a `.env` file in your root directory
 
 ```env
 GROQ_API_KEY=your_groq_api_key_here
 ```
 
-Step 5: Run the server
+**Step 5:** Run the server
 
 ```bash
-fastapi dev
+python -m uvicorn main:app --reload
 ```
 
 Click on the provided docs URL to view your documented API.
