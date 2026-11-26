@@ -1,8 +1,9 @@
 from unittest.mock import MagicMock
 from fastapi.testclient import TestClient
-from main import app, get_groq
+from main import app, get_groq, require_api_key
 import json
 
+app.dependency_overrides[require_api_key] = lambda: None  # Bypass API key check for testing
 client = TestClient(app)
 
 def test_invalid_ai_response():
