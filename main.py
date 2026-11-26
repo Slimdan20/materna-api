@@ -1,7 +1,7 @@
 from typing import Optional
 from fastapi import FastAPI, HTTPException
 from fastapi import Request
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from pydantic import Field
 from fastapi import Path
 from fastapi import Depends
@@ -11,6 +11,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from fastapi import Header
+from fastapi.security import APIKeyHeader
 import os
 import json
 import secrets 
@@ -126,6 +127,26 @@ def sanitize_input(text: str) -> str:
             )
     return text.strip()
 
+class keyRequest(BaseModel):
+    email: EmailStr
+
+@app.post("/v1/generate-key", status_code=201)
+@limiter.limit("5/hour")
+def generate_key(request: Request, body: keyRequest):
+    key = create_api_key(body.email)
+    return {"api_key": key, 
+            "message": "API key generated successfully. Please store it securely, as it will not be shown again.",
+            "usage": "Include this API key in the 'X-API-Key' header of your requests to access the Materna API."
+            }
+
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+def require_api_key(api_key_header: str = Depends(api_key_header)):
+    if api_key_header is None or not verify_api_key(api_key_header):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or missing API key"
+        )
 
 class RiskAssessmentRequest(BaseModel):
     trimester: int = Field(..., ge=1, le=3,
