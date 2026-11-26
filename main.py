@@ -10,8 +10,72 @@ from groq import Groq
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+from fastapi import Header
 import os
 import json
+import secrets 
+import base64
+import sqlite3
+import hashlib
+
+conn = sqlite3.connect('materna.db')
+cursor = conn.cursor()
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS api_keys (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    key_hash TEXT UNIQUE NOT NULL,
+    key_prefix TEXT NOT NULL,
+    owner TEXT NOT NULL,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)
+''')
+
+conn.commit()
+conn.close()
+
+def generate_api_key(prefix: str = "materna_") -> str:
+    bytes_key = secrets.token_bytes(32)  # Generate 32 random bytes
+    random_key = base64.urlsafe_b64encode(bytes_key).decode('utf-8').rstrip('=')
+    
+    api_key = f"{prefix}{random_key}"
+    return api_key
+
+def create_api_key(owner):
+    raw_key = generate_api_key()
+    key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
+    key_prefix = raw_key[:12]  # First 12 characters of the raw key as prefix
+    
+    conn = sqlite3.connect('materna.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO api_keys (key_hash, key_prefix, owner)
+        VALUES (?, ?, ?)
+    ''', (key_hash, key_prefix, owner))
+    
+    conn.commit()
+    conn.close()
+    
+    return raw_key
+
+def verify_api_key(key):
+    key_hash = hashlib.sha256(key.encode()).hexdigest()
+
+    conn = sqlite3.connect('materna.db')
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT id FROM api_keys WHERE key_hash = ? AND is_active = 1",
+        (key_hash,)
+    )
+    row = cursor.fetchone()
+    conn.close()
+
+    return row is not None
+
+def require_api_key(x_api_key: str = Header(None)):
+    if x_api_key is None or not verify_api_key(x_api_key):
+        raise HTTPException(status_code=401, detail="Invalid or missing API key")
+
 
 limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(
@@ -34,7 +98,7 @@ def get_groq():
 
 def call_groq(prompt: str, get_groq_client) -> dict:
     response = get_groq_client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
+        model="openai/gpt-oss-120b",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.3
     )
@@ -70,7 +134,7 @@ class RiskAssessmentRequest(BaseModel):
                                 max_length=100, description="List of symptoms")
 
 
-@app.post("/v1/risk-assessment")
+@app.post("/v1/risk-assessment", dependencies=[Depends(require_api_key)])
 @limiter.limit("30/minute")
 def risk_assessment(request:Request, data: RiskAssessmentRequest, get_groq_client=Depends(get_groq)):
     try:
@@ -112,7 +176,7 @@ def risk_assessment(request:Request, data: RiskAssessmentRequest, get_groq_clien
             status_code=500, detail=f"An error occurred: {str(e)}")
 
 
-@app.get("/v1/weekly-guidance/{week}")
+@app.get("/v1/weekly-guidance/{week}", dependencies=[Depends(require_api_key)])
 @limiter.limit("30/minute")
 def weekly_guidance(request:Request, week: int = Path(..., ge=1, le=40, description="Week of pregnancy (1-40)"), get_groq_client=Depends(get_groq)):
     try:
@@ -153,7 +217,7 @@ class DrugSafetyRequest(BaseModel):
                            description="Trimester of pregnancy (1, 2, or 3)")
 
 
-@app.post("/v1/drug-safety")
+@app.post("/v1/drug-safety", dependencies=[Depends(require_api_key)])
 @limiter.limit("30/minute")
 def drug_safety(request:Request, data: DrugSafetyRequest, get_groq_client=Depends(get_groq)):
     try:
@@ -193,7 +257,7 @@ def drug_safety(request:Request, data: DrugSafetyRequest, get_groq_client=Depend
             status_code=500, detail=f"An error occurred: {str(e)}")
 
 
-@app.get("/v1/antenatal-schedule")
+@app.get("/v1/antenatal-schedule", dependencies=[Depends(require_api_key)])
 @limiter.limit("30/minute")
 def antenatal_schedule(request: Request, get_groq_client=Depends(get_groq)):
     try:
@@ -238,7 +302,7 @@ class ConditionInformationRequest(BaseModel):
                            description="Name of the condition")
 
 
-@app.post("/v1/condition-info")
+@app.post("/v1/condition-info", dependencies=[Depends(require_api_key)])
 @limiter.limit("30/minute")
 def condition_info(request: Request, data: ConditionInformationRequest, get_groq_client=Depends(get_groq)):
     try:
@@ -290,7 +354,7 @@ class NutritionGuidanceRequest(BaseModel):
                              description="Nationality of the pregnant woman")
 
 
-@app.post("/v1/nutritional-guidance")
+@app.post("/v1/nutritional-guidance", dependencies=[Depends(require_api_key)])
 @limiter.limit("30/minute")
 def nutritional_guidance(request:Request, data: NutritionGuidanceRequest, get_groq_client=Depends(get_groq)):
     try:
@@ -342,7 +406,7 @@ class DeliveryPrepRequest(BaseModel):
         None, description="List of complications")
 
 
-@app.post("/v1/delivery-prep")
+@app.post("/v1/delivery-prep", dependencies=[Depends(require_api_key)])
 @limiter.limit("30/minute")
 def delivery_prep(request:Request, data: DeliveryPrepRequest, get_groq_client=Depends(get_groq)):
     try:
@@ -388,7 +452,7 @@ def delivery_prep(request:Request, data: DeliveryPrepRequest, get_groq_client=De
             status_code=500, detail=f"An error occurred: {str(e)}")
 
 
-@app.get("/v1/labor-signs")
+@app.get("/v1/labor-signs", dependencies=[Depends(require_api_key)])
 @limiter.limit("30/minute")
 def labor_signs(request:Request, get_groq_client=Depends(get_groq)):
     try:
