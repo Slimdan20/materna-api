@@ -10,7 +10,7 @@ from groq import Groq
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
-from fastapi import Header
+import logging
 from fastapi.security import APIKeyHeader
 import os
 import json
@@ -73,11 +73,6 @@ def verify_api_key(key):
 
     return row is not None
 
-def require_api_key(x_api_key: str = Header(None)):
-    if x_api_key is None or not verify_api_key(x_api_key):
-        raise HTTPException(status_code=401, detail="Invalid or missing API key")
-
-
 limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(
     title="Materna API",
@@ -130,16 +125,24 @@ def sanitize_input(text: str) -> str:
 class keyRequest(BaseModel):
     email: EmailStr
 
+BLOCKED_DOMAINS = ["example.com", "example.org", "example.net", "test.com"]
+
 @app.post("/v1/generate-key", status_code=201)
 @limiter.limit("5/hour")
 def generate_key(request: Request, body: keyRequest):
+    domain = body.email.split('@')[-1]
+    if domain in BLOCKED_DOMAINS:
+        raise HTTPException(
+            status_code=422,
+            detail="Email domain is not allowed. Please use a valid email address."
+        )
     key = create_api_key(body.email)
     return {"api_key": key, 
             "message": "API key generated successfully. Please store it securely, as it will not be shown again.",
             "usage": "Include this API key in the 'X-API-Key' header of your requests to access the Materna API."
             }
 
-api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False, description= "Get a key from POST /v1/generate-key, then paste it here.")
 
 def require_api_key(api_key_header: str = Depends(api_key_header)):
     if api_key_header is None or not verify_api_key(api_key_header):
@@ -192,9 +195,10 @@ def risk_assessment(request:Request, data: RiskAssessmentRequest, get_groq_clien
         raise HTTPException(
             status_code=500, detail="AI returned an invalid response. Please try again.")
 
-    except Exception as e:
+    except Exception:
+        logging.exception("Request failed")
         raise HTTPException(
-            status_code=500, detail=f"An error occurred: {str(e)}")
+            status_code=500, detail="Something went wrong. please try again later.")
 
 
 @app.get("/v1/weekly-guidance/{week}", dependencies=[Depends(require_api_key)])
@@ -226,9 +230,10 @@ def weekly_guidance(request:Request, week: int = Path(..., ge=1, le=40, descript
         raise HTTPException(
             status_code=500, detail="AI returned an invalid response. Please try again.")
 
-    except Exception as e:
+    except Exception:
+        logging.exception("Request failed")
         raise HTTPException(
-            status_code=500, detail=f"An error occurred: {str(e)}")
+            status_code=500, detail="Something went wrong. please try again later.")
 
 
 class DrugSafetyRequest(BaseModel):
@@ -273,9 +278,10 @@ def drug_safety(request:Request, data: DrugSafetyRequest, get_groq_client=Depend
         raise HTTPException(
             status_code=500, detail="AI returned an invalid response. Please try again.")
 
-    except Exception as e:
+    except Exception:
+        logging.exception("Request failed")
         raise HTTPException(
-            status_code=500, detail=f"An error occurred: {str(e)}")
+            status_code=500, detail="Something went wrong. please try again later.")
 
 
 @app.get("/v1/antenatal-schedule", dependencies=[Depends(require_api_key)])
@@ -313,9 +319,10 @@ def antenatal_schedule(request: Request, get_groq_client=Depends(get_groq)):
         raise HTTPException(
             status_code=500, detail="AI returned an invalid response. Please try again.")
 
-    except Exception as e:
+    except Exception:
+        logging.exception("Request failed")
         raise HTTPException(
-            status_code=500, detail=f"An error occurred: {str(e)}")
+            status_code=500, detail="Something went wrong. please try again later.")
 
 
 class ConditionInformationRequest(BaseModel):
@@ -362,9 +369,10 @@ def condition_info(request: Request, data: ConditionInformationRequest, get_groq
         raise HTTPException(
             status_code=500, detail="AI returned an invalid response. Please try again.")
 
-    except Exception as e:
+    except Exception:
+        logging.exception("Request failed")
         raise HTTPException(
-            status_code=500, detail=f"An error occurred: {str(e)}")
+            status_code=500, detail="Something went wrong. please try again later.")
 
 
 class NutritionGuidanceRequest(BaseModel):
@@ -390,7 +398,7 @@ def nutritional_guidance(request:Request, data: NutritionGuidanceRequest, get_gr
 
       CRITICAL SAFETY RULE: Evaluate if the provided nationality is an actual, plausible nationality. 
         If the nationality is completely invalid, names, gibberish, or unrelated (e.g., "nancy", "micheal"):
-        - set nutritional_priority to null,
+        - set nutrient_priority to null,
         - set recommended_meals to null,
         - set foods_to_avoid to null,
         - set cultural_tips to null,
@@ -416,9 +424,10 @@ def nutritional_guidance(request:Request, data: NutritionGuidanceRequest, get_gr
         raise HTTPException(
             status_code=500, detail="AI returned an invalid response. Please try again.")
 
-    except Exception as e:
+    except Exception:
+        logging.exception("Request failed")
         raise HTTPException(
-            status_code=500, detail=f"An error occurred: {str(e)}")
+            status_code=500, detail="Something went wrong. please try again later.")
 
 
 class DeliveryPrepRequest(BaseModel):
@@ -468,9 +477,10 @@ def delivery_prep(request:Request, data: DeliveryPrepRequest, get_groq_client=De
         raise HTTPException(
             status_code=500, detail="AI returned an invalid response. Please try again.")
 
-    except Exception as e:
+    except Exception:
+        logging.exception("Request failed")
         raise HTTPException(
-            status_code=500, detail=f"An error occurred: {str(e)}")
+            status_code=500, detail="Something went wrong. please try again later.")
 
 
 @app.get("/v1/labor-signs", dependencies=[Depends(require_api_key)])
@@ -502,6 +512,7 @@ def labor_signs(request:Request, get_groq_client=Depends(get_groq)):
         raise HTTPException(
             status_code=500, detail="AI returned an invalid response. Please try again.")
 
-    except Exception as e:
+    except Exception:
+        logging.exception("Request failed")
         raise HTTPException(
-            status_code=500, detail=f"An error occurred: {str(e)}")
+            status_code=500, detail="Something went wrong. please try again later.")
